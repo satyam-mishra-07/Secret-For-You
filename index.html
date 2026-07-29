@@ -204,6 +204,30 @@
   }
 
   /* =====================================================
+     ENTRY GATE (tap to begin - unlocks audio immediately)
+  ===================================================== */
+  .entry-gate{
+    position:fixed;inset:0;z-index:300;
+    display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(60% 50% at 50% 40%, rgba(221,106,52,.24), transparent 60%),
+      linear-gradient(180deg, var(--maroon-900), var(--maroon-950));
+    cursor:pointer;transition:opacity .6s var(--ease);
+  }
+  .entry-gate.hidden{opacity:0;pointer-events:none;}
+  .entry-gate-inner{text-align:center;padding:2rem;}
+  .gate-heart{
+    font-size:2.6rem;color:var(--gold);margin-bottom:1rem;
+    animation:pulse 1.8s ease-in-out infinite;
+  }
+  .gate-title{
+    font-size:clamp(1.8rem,6vw,2.6rem);font-style:italic;font-weight:500;
+  }
+  .gate-sub{
+    margin-top:.7rem;font-size:.85rem;color:var(--blush);opacity:.8;font-weight:300;letter-spacing:.04em;
+  }
+
+  /* =====================================================
      POEM FLIP CARD
   ===================================================== */
   #panel-poem .inner{display:flex;flex-direction:column;align-items:center;width:100%;}
@@ -342,6 +366,14 @@
 </head>
 <body>
 
+<div class="entry-gate" id="entryGate" role="button" tabindex="0" aria-label="Tap to begin">
+  <div class="entry-gate-inner">
+    <p class="eyebrow" style="text-align:center;">For Ritika 💌</p>
+    <div class="gate-heart">♥</div>
+    <h2 class="gate-title shimmer-text">Tap to begin</h2>
+  </div>
+</div>
+
 <div class="backdrop"></div>
 <div class="grain"></div>
 <div class="ambient" id="ambient"></div>
@@ -466,9 +498,10 @@ loving you taught me to love myself, once in a while.</p>
   <div class="letter-scroll">
     <div class="letter-body">
       <p>Hey Ritika,</p>
-      <p>I know there is a lot we still need to know about each other, but in the past few days I have known one thing for sure — I want to see myself with you in any and every version of my future. I want you to see me in your version of the future.</p>
-      <p>I know we haven't met yet, and you may still have your doubts. But trust me when I say this — we can resolve all the doubts, questions, issues, everything, together. Things may get hard with time, but I will, we will make sure the glass remains full, no matter what.</p>
-      <p>I love you, Ritika.</p>
+      <p>I know there is a lot we still need to know about each other, but in the past few days I have known one thing for sure — I want to see myself with you in any and every version of my future, and I want you to see me in your version of the future.</p>
+      <p>Trust me when I say this: together, we can face any problems or hard times. Things may get hard sometimes, but we will make sure the glass remains full, no matter what.</p>
+      <p>I wish I could meet you soon, look deeply into your eyes, and tell you this.</p>
+      <p>I love you, Ritika. I love you a lot.</p>
       <p class="letter-sign">Your Satyam</p>
     </div>
     <figure class="chat-attach">
@@ -587,6 +620,7 @@ loving you taught me to love myself, once in a while.</p>
   let ytFailed = false;
   let userWantsSound = true;
   let unmuteListenersActive = false;
+  let gateTapped = false;
 
   window.onYouTubeIframeAPIReady = function(){
     ytPlayer = new YT.Player('yt-player', {
@@ -602,7 +636,12 @@ loving you taught me to love myself, once in a while.</p>
           ytReady = true;
           e.target.mute();
           e.target.playVideo();
-          armFirstInteractionUnmute();
+          if (gateTapped){
+            // the gate tap itself was a real user gesture, so unlock sound now
+            tryUnmute();
+          } else {
+            armFirstInteractionUnmute();
+          }
         },
         onError: function(){
           // video can't be embedded/played here (e.g. embedding disabled) -
@@ -635,7 +674,7 @@ loving you taught me to love myself, once in a while.</p>
   function armFirstInteractionUnmute(){
     if (unmuteListenersActive) return;
     unmuteListenersActive = true;
-    const events = ['click','touchend','pointerdown','keydown','wheel'];
+    const events = ['click','touchend','pointerdown','keydown'];
     function handler(){
       tryUnmute();
       // keep listening a little longer in case the very first gesture
@@ -647,8 +686,10 @@ loving you taught me to love myself, once in a while.</p>
       }
     }
     events.forEach(ev => window.addEventListener(ev, handler, { passive:true }));
-    // also try immediately in case autoplay-with-sound is already allowed
-    tryUnmute();
+    // NOTE: we deliberately do NOT call tryUnmute() here before any real
+    // gesture has happened - browsers block audible autoplay until a genuine
+    // user interaction, so calling it early only faked a "playing" icon
+    // while staying silent. We wait for a real click/tap/keypress instead.
   }
 
   musicToggle.addEventListener('click', ()=>{
@@ -668,6 +709,24 @@ loving you taught me to love myself, once in a while.</p>
       musicToggle.setAttribute('aria-label','Play music');
       musicToggle.classList.remove('playing');
     }
+  });
+
+  /* ---- entry gate: this tap IS the user gesture, so sound starts for real ---- */
+  const entryGate = document.getElementById('entryGate');
+  function openGate(){
+    if (gateTapped) return;
+    gateTapped = true;
+    entryGate.classList.add('hidden');
+    setTimeout(()=>{ entryGate.style.display = 'none'; }, 650);
+    if (ytReady){
+      tryUnmute();
+    }
+    // if the player isn't ready yet, onReady() will call tryUnmute() itself
+    // as soon as it fires, since gateTapped is now true
+  }
+  entryGate.addEventListener('click', openGate);
+  entryGate.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openGate(); }
   });
 
 })();
